@@ -185,7 +185,7 @@ minetest.register_abm(
 				if meta:get_float("enabled") > 0 then
 					local target_coords={x=meta:get_float("x"), y=meta:get_float("y"), z=meta:get_float("z")}
 					minetest.sound_play("teleporter_teleport", {pos = pos, gain = 1.0, max_hear_distance = 10,})
-					player:moveto(target_coords, false)
+					player:setpos(target_coords)
 					minetest.sound_play("teleporter_teleport", {pos = target_coords, gain = 1.0, max_hear_distance = 10,})
 				end
 			end
