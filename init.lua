@@ -181,6 +181,7 @@ minetest.register_abm(
 		local objs = minetest.env:get_objects_inside_radius(pos, 1)
 		for k, player in pairs(objs) do
 			if player:get_player_name()~=nil then 
+				local name = player:get_player_name()
 				local privs = minetest.get_player_privs(name)
 				if not privs["interact"] then
 					return
