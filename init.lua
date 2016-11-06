@@ -181,6 +181,10 @@ minetest.register_abm(
 		local objs = minetest.env:get_objects_inside_radius(pos, 1)
 		for k, player in pairs(objs) do
 			if player:get_player_name()~=nil then 
+				local privs = minetest.get_player_privs(name)
+				if not privs["interact"] then
+					return
+				end
 				local meta = minetest.env:get_meta(pos)
 				if meta:get_float("enabled") > 0 then
 					local target_coords={x=meta:get_float("x"), y=meta:get_float("y"), z=meta:get_float("z")}
