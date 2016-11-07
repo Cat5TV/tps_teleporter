@@ -32,7 +32,109 @@ minetest.register_craft({
         }
 })
 
--- This version does NOT require interact (ideal for inside a spawn house)
+minetest.register_node("teleporter:teleport_pad", {
+	tile_images = {teleporter.tile_image},
+	drawtype = "signlike",
+	paramtype = "light",
+	paramtype2 = "wallmounted",
+	walkable = false,
+	description="Teleport Pad",
+	inventory_image = teleporter.tile_image,
+	metadata_name = "sign",
+	--sounds = default.node_sound_defaults(),
+	groups = {choppy=2,dig_immediate=2},
+	selection_box = {
+		type = "wallmounted",
+	},
+        on_construct = function(pos)
+                local meta = minetest.env:get_meta(pos)
+--                meta:set_string("formspec", "hack:sign_text_input")
+		meta:set_string("formspec", "field[text;;${text}]")
+                meta:set_string("infotext", "\"Teleport to "..teleporter.default_coordinates.desc.."\"")
+		meta:set_string("text", teleporter.default_coordinates.x..","..
+			teleporter.default_coordinates.y..","..
+			teleporter.default_coordinates.z..","..
+			teleporter.default_coordinates.desc)
+		meta:set_float("enabled", -1)
+		meta:set_float("x", teleporter.default_coordinates.x)
+		meta:set_float("y", teleporter.default_coordinates.y)
+		meta:set_float("z", teleporter.default_coordinates.z)
+        end,
+	after_place_node = function(pos, placer)
+		local meta = minetest.env:get_meta(pos)
+		local name = placer:get_player_name()
+		meta:set_string("owner", name)
+		
+		if teleporter.perms_to_build and not minetest.get_player_privs(name)["teleport"] then
+			minetest.chat_send_player(name, 'Teleporter:  Teleport privileges are required to build teleporters.')
+			minetest.env:remove_node(pos)
+			minetest.env:add_item(pos, 'teleporter:teleport_pad')
+		else
+			meta:set_float("enabled", 1)
+		end
+
+	end,
+        on_receive_fields = function(pos, formname, fields, sender)
+		local coords = teleporter.coordinates(fields.text)
+                local meta = minetest.env:get_meta(pos)
+		local name = sender:get_player_name()
+		local privs = minetest.get_player_privs(name)
+
+		if name ~= meta:get_string("owner") and not privs["server"] then
+			minetest.chat_send_player(name, 'Teleporter:  This is not your teleporter, it belongs to '..meta:get_string("owner"))
+			return false
+		else if privs["server"] then
+			minetest.chat_send_player(name, 'Teleporter:  This teleporter belongs to '..meta:get_string("owner"))
+		end
+
+		if teleporter.perms_to_configure and not privs["teleport"] then
+			minetest.chat_send_player(name, 'Teleporter:  You need teleport privileges to configure a teleporter')
+			return
+		end
+
+		local infotext = ""
+		if coords~=nil then	
+			meta:set_float("x", coords.x)
+			meta:set_float("y", coords.y)
+			meta:set_float("z", coords.z)
+			if teleporter.requires_pairing and not teleporter.is_paired(coords) and not privs["server"] then
+				minetest.chat_send_player(name, 'Teleporter:  There is no recently-used teleporter pad at the destination!')
+		                meta:set_string("text", fields.text)
+				infotext="Teleporter is Disabled"
+				meta:set_float("enabled", -1)
+			else
+				meta:set_float("enabled", 1)
+				if coords.desc~=nil then
+					infotext="Teleport to "..coords.desc
+				else
+					infotext="Teleport to "..coords.x..","..coords.y..","..coords.z..""
+				end
+			end
+		else
+			minetest.chat_send_player(name, 'Teleporter:  Incorrect coordinates.  Enter them as \'X,Y,Z,Description\' without decimals.')
+			meta:set_float("enabled", -1)
+			infotext="Teleporter Offline"
+		end
+
+		--[[print((sender:get_player_name() or "").." entered \""..fields.text..
+			"\" to teleporter at "..minetest.pos_to_string(pos))]]
+		meta:set_string("text", fields.text)
+		meta:set_string("infotext", '"'..infotext..'"')
+        end
+	end,
+	can_dig = function(pos,player)
+		if not player then return end -- because quarries can dig too
+		local meta = minetest.env:get_meta(pos)
+		local name = player:get_player_name()
+		local privs = minetest.get_player_privs(name)
+		if name == meta:get_string("owner") or privs["server"] then
+			return true
+		end
+		return false
+	end
+})
+
+-- This version does NOT require interact (ideal for use in a spawn house)
 minetest.register_node("teleporter:teleport_pad_nointeract", {
 	tile_images = {teleporter.tile_image},
 	drawtype = "signlike",
@@ -135,53 +237,6 @@ minetest.register_node("teleporter:teleport_pad_nointeract", {
 	end
 })
 
-			minetest.chat_send_player(name, 'Teleporter:  You need teleport privileges to configure a teleporter')
-			return
-		end
-
-		local infotext = ""
-		if coords~=nil then	
-			meta:set_float("x", coords.x)
-			meta:set_float("y", coords.y)
-			meta:set_float("z", coords.z)
-			if teleporter.requires_pairing and not teleporter.is_paired(coords) and not privs["server"] then
-				minetest.chat_send_player(name, 'Teleporter:  There is no recently-used teleporter pad at the destination!')
-		                meta:set_string("text", fields.text)
-				infotext="Teleporter is Disabled"
-				meta:set_float("enabled", -1)
-			else
-				meta:set_float("enabled", 1)
-				if coords.desc~=nil then
-					infotext="Teleport to "..coords.desc
-				else
-					infotext="Teleport to "..coords.x..","..coords.y..","..coords.z..""
-				end
-			end
-		else
-			minetest.chat_send_player(name, 'Teleporter:  Incorrect coordinates.  Enter them as \'X,Y,Z,Description\' without decimals.')
-			meta:set_float("enabled", -1)
-			infotext="Teleporter Offline"
-		end
-
-		--[[print((sender:get_player_name() or "").." entered \""..fields.text..
-			"\" to teleporter at "..minetest.pos_to_string(pos))]]
-		meta:set_string("text", fields.text)
-		meta:set_string("infotext", '"'..infotext..'"')
-        end
-	end,
-	can_dig = function(pos,player)
-		if not player then return end -- because quarries can dig too
-		local meta = minetest.env:get_meta(pos)
-		local name = player:get_player_name()
-		local privs = minetest.get_player_privs(name)
-		if name == meta:get_string("owner") or privs["server"] then
-			return true
-		end
-		return false
-	end
-})
-
-
 teleporter.is_paired = function(coords) 
 	for dx=-teleporter.pairing_check_radius,teleporter.pairing_check_radius do
 		for dy=-teleporter.pairing_check_radius,teleporter.pairing_check_radius do
@@ -247,6 +302,7 @@ minetest.register_abm(
 })
 
 
+
 minetest.register_abm(
 	{nodenames = {"teleporter:teleport_pad_nointeract"},
 	interval = 2.0,
@@ -266,4 +322,3 @@ minetest.register_abm(
 		end
 	end	
 })
-
